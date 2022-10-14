@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/Shopify/sarama v1.37.2
-	github.com/duolacloud/broker-core v0.0.0-20221013190251-e035e10ea5b1
+	github.com/duolacloud/broker-core v0.0.1
 	github.com/google/uuid v1.3.0
 	github.com/huandu/go-clone v1.4.0
 	github.com/stretchr/testify v1.8.0
@@ -34,5 +34,3 @@ require (
 	golang.org/x/net v0.0.0-20220927171203-f486391704dc // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/duolacloud/broker-core => ../broker-core
