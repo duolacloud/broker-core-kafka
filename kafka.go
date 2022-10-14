@@ -38,7 +38,7 @@ type publication struct {
 	err  error
 	cg   sarama.ConsumerGroup
 	km   *sarama.ConsumerMessage
-	m    *broker.Message
+	m    any
 	sess sarama.ConsumerGroupSession
 }
 
@@ -46,7 +46,7 @@ func (p *publication) Topic() string {
 	return p.t
 }
 
-func (p *publication) Message() *broker.Message {
+func (p *publication) Message() any {
 	return p.m
 }
 
@@ -211,7 +211,7 @@ func (k *kBroker) Options() broker.Options {
 	return k.opts
 }
 
-func (k *kBroker) Publish(topic string, msg *broker.Message, opts ...broker.PublishOption) error {
+func (k *kBroker) Publish(topic string, msg any, opts ...broker.PublishOption) error {
 	b, err := k.opts.Codec.Marshal(msg)
 	if err != nil {
 		return err

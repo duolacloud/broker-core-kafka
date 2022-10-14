@@ -6,6 +6,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/duolacloud/broker-core"
+	"github.com/huandu/go-clone"
 )
 
 var (
@@ -65,33 +66,25 @@ func (*consumerGroupHandler) Setup(_ sarama.ConsumerGroupSession) error   { retu
 func (*consumerGroupHandler) Cleanup(_ sarama.ConsumerGroupSession) error { return nil }
 func (h *consumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
-		var m broker.Message
-		p := &publication{m: &m, t: msg.Topic, km: msg, cg: h.cg, sess: sess}
+		p := &publication{t: msg.Topic, km: msg, cg: h.cg, sess: sess}
 		eh := h.kopts.ErrorHandler
 
-		if err := h.kopts.Codec.Unmarshal(msg.Value, &m); err != nil {
-			p.err = err
-			p.m.Body = msg.Value
-			if eh != nil {
-				eh(p)
-			} else {
-				fmt.Printf("[kafka]: failed to unmarshal: %v", err)
+		if h.subopts.ResultType != nil {
+			p.m = clone.Clone(h.subopts.ResultType)
+			if err := h.kopts.Codec.Unmarshal(msg.Value, p.m); err != nil {
+				p.err = err
+				p.m = msg.Value
+				if eh != nil {
+					eh(p)
+				} else {
+					fmt.Printf("[kafka]: failed to unmarshal: %v", err)
+				}
+				continue
 			}
-			continue
 		}
 
-		if p.m.Body == nil {
-			p.m.Body = msg.Value
-		}
-		// if we don't have headers, create empty map
-		if m.Header == nil {
-			m.Header = make(map[string]string)
-		}
-		for _, header := range msg.Headers {
-			m.Header[string(header.Key)] = string(header.Value)
-		}
-		if _, ok := m.Header["Content-Type"]; !ok {
-			m.Header["Content-Type"] = "application/json" // default to json codec
+		if p.m == nil {
+			p.m = msg.Value
 		}
 
 		err := h.handler(p)
