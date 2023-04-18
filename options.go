@@ -98,6 +98,7 @@ func (h *consumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, cl
 		if _, ok := m.Header["Content-Type"]; !ok {
 			m.Header["Content-Type"] = "application/json" // default to json codec
 		}
+		m.Partition = msg.Partition
 
 		err := h.handler(p)
 		if err == nil && h.subopts.AutoAck {
