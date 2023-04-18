@@ -6,7 +6,6 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/duolacloud/broker-core"
-	"github.com/huandu/go-clone"
 )
 
 var (
@@ -42,7 +41,7 @@ func AsyncProducer(errors chan<- *sarama.ProducerError, successes chan<- *sarama
 
 type subscribeContextKey struct{}
 
-// SubscribeContext set the context for broker.SubscribeOption.
+// SubscribeContext set the context for broker.SubscribeOption
 func SubscribeContext(ctx context.Context) broker.SubscribeOption {
 	return setSubscribeOption(subscribeContextKey{}, ctx)
 }
@@ -53,7 +52,7 @@ func SubscribeConfig(c *sarama.Config) broker.SubscribeOption {
 	return setSubscribeOption(subscribeConfigKey{}, c)
 }
 
-// consumerGroupHandler is the implementation of sarama.ConsumerGroupHandler.
+// consumerGroupHandler is the implementation of sarama.ConsumerGroupHandler
 type consumerGroupHandler struct {
 	handler broker.Handler
 	subopts broker.SubscribeOptions
@@ -64,27 +63,40 @@ type consumerGroupHandler struct {
 
 func (*consumerGroupHandler) Setup(_ sarama.ConsumerGroupSession) error   { return nil }
 func (*consumerGroupHandler) Cleanup(_ sarama.ConsumerGroupSession) error { return nil }
+
 func (h *consumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
-		p := &publication{t: msg.Topic, km: msg, cg: h.cg, sess: sess}
+		var m broker.Message
+		p := &publication{m: &m, t: msg.Topic, km: msg, cg: h.cg, sess: sess}
 		eh := h.kopts.ErrorHandler
 
-		if h.subopts.ResultType != nil {
-			p.m = clone.Clone(h.subopts.ResultType)
-			if err := h.kopts.Codec.Unmarshal(msg.Value, p.m); err != nil {
+		if h.kopts.Codec != nil {
+			if err := h.kopts.Codec.Unmarshal(msg.Value, &m); err != nil {
 				p.err = err
-				p.m = msg.Value
+				p.m.Body = msg.Value
 				if eh != nil {
 					eh(p)
 				} else {
-					fmt.Printf("[kafka]: failed to unmarshal: %v", err)
+					// log.Errorf("[kafka]: failed to unmarshal: %v", err)
+					fmt.Printf("[kafka] failed to unmarshal: %v\n", err)
 				}
 				continue
 			}
 		}
 
-		if p.m == nil {
-			p.m = msg.Value
+		if p.m.Body == nil {
+			p.m.Body = msg.Value
+		}
+		// if we don't have headers, create empty map
+		if m.Header == nil {
+			m.Header = make(map[string]string)
+		}
+		for _, header := range msg.Headers {
+			m.Header[string(header.Key)] = string(header.Value)
+		}
+		// m.Header["Micro-Topic"] = msg.Topic // only for RPC server, it somehow inspect Header for topic
+		if _, ok := m.Header["Content-Type"]; !ok {
+			m.Header["Content-Type"] = "application/json" // default to json codec
 		}
 
 		err := h.handler(p)
@@ -95,7 +107,8 @@ func (h *consumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, cl
 			if eh != nil {
 				eh(p)
 			} else {
-				fmt.Printf("[kafka]: subscriber error: %v", err)
+				// log.Errorf("[kafka]: subscriber error: %v", err)
+				fmt.Printf("[kafka] subscriber error: %v\n", err)
 			}
 		}
 	}

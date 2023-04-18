@@ -1,3 +1,4 @@
+// Package kafka provides a kafka broker using sarama cluster
 package kafka
 
 import (
@@ -8,7 +9,6 @@ import (
 
 	"github.com/Shopify/sarama"
 	"github.com/duolacloud/broker-core"
-	"github.com/duolacloud/broker-core/marshaler"
 	"github.com/google/uuid"
 )
 
@@ -38,7 +38,7 @@ type publication struct {
 	err  error
 	cg   sarama.ConsumerGroup
 	km   *sarama.ConsumerMessage
-	m    any
+	m    *broker.Message
 	sess sarama.ConsumerGroupSession
 }
 
@@ -46,7 +46,7 @@ func (p *publication) Topic() string {
 	return p.t
 }
 
-func (p *publication) Message() any {
+func (p *publication) Message() *broker.Message {
 	return p.m
 }
 
@@ -211,16 +211,35 @@ func (k *kBroker) Options() broker.Options {
 	return k.opts
 }
 
-func (k *kBroker) Publish(topic string, msg any, opts ...broker.PublishOption) error {
-	b, err := k.opts.Codec.Marshal(msg)
-	if err != nil {
-		return err
+func (k *kBroker) Publish(topic string, msg *broker.Message, opts ...broker.PublishOption) error {
+	headers := make([]sarama.RecordHeader, 0)
+	if len(msg.Header) > 0 {
+		for k, v := range msg.Header {
+			headers = append(headers, sarama.RecordHeader{
+				Key:   []byte(k),
+				Value: []byte(v),
+			})
+		}
+	}
+
+	var err error
+	var body []byte
+	if k.opts.Codec != nil {
+		body, err = k.opts.Codec.Marshal(msg)
+		if err != nil {
+			fmt.Printf("[kafka] failed to marshal: %v", err)
+			return err
+		}
+	} else {
+		body = msg.Body
 	}
 
 	var produceMsg = &sarama.ProducerMessage{
-		Topic:    topic,
-		Value:    sarama.ByteEncoder(b),
-		Metadata: msg,
+		Topic:     topic,
+		Value:     sarama.ByteEncoder(body),
+		Metadata:  msg,
+		Headers:   headers,
+		Partition: msg.Partition,
 	}
 	if k.ap != nil {
 		k.ap.Input() <- produceMsg
@@ -271,7 +290,8 @@ func (k *kBroker) Subscribe(topic string, handler broker.Handler, opts ...broker
 			select {
 			case err := <-cg.Errors():
 				if err != nil {
-					fmt.Printf("consumer error: %v", err)
+					fmt.Printf("[kafka] consumer error: %v\n", err)
+					// log.Errorf("consumer error:", err)
 				}
 			default:
 				err := cg.Consume(ctx, topics, h)
@@ -281,7 +301,8 @@ func (k *kBroker) Subscribe(topic string, handler broker.Handler, opts ...broker
 				case nil:
 					continue
 				default:
-					fmt.Print(err)
+					fmt.Printf("[kafka] %v\n", err)
+					// log.Error(err)
 				}
 			}
 		}
@@ -295,8 +316,6 @@ func (k *kBroker) String() string {
 
 func NewBroker(opts ...broker.Option) broker.Broker {
 	options := broker.Options{
-		// default to json codec
-		Codec:   marshaler.JsonMarshaler{},
 		Context: context.Background(),
 	}
 

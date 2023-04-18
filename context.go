@@ -6,7 +6,7 @@ import (
 	"github.com/duolacloud/broker-core"
 )
 
-// setSubscribeOption returns a function to setup a context with given value.
+// setSubscribeOption returns a function to setup a context with given value
 func setSubscribeOption(k, v any) broker.SubscribeOption {
 	return func(o *broker.SubscribeOptions) {
 		if o.Context == nil {
@@ -16,8 +16,8 @@ func setSubscribeOption(k, v any) broker.SubscribeOption {
 	}
 }
 
-// setBrokerOption returns a function to setup a context with given value.
-func setBrokerOption(k, v any) broker.Option {
+// setBrokerOption returns a function to setup a context with given value
+func setBrokerOption(k, v interface{}) broker.Option {
 	return func(o *broker.Options) {
 		if o.Context == nil {
 			o.Context = context.Background()
@@ -26,8 +26,8 @@ func setBrokerOption(k, v any) broker.Option {
 	}
 }
 
-// // setPublishOption returns a function to setup a context with given value.
-// func setPublishOption(k, v any) broker.PublishOption {
+// setPublishOption returns a function to setup a context with given value
+// func setPublishOption(k, v interface{}) broker.PublishOption {
 // 	return func(o *broker.PublishOptions) {
 // 		if o.Context == nil {
 // 			o.Context = context.Background()
