@@ -211,7 +211,7 @@ func (k *kBroker) Options() broker.Options {
 	return k.opts
 }
 
-func (k *kBroker) Publish(topic string, msg *broker.Message, opts ...broker.PublishOption) error {
+func (k *kBroker) Publish(ctx context.Context, topic string, msg *broker.Message, opts ...broker.PublishOption) error {
 	headers := make([]sarama.RecordHeader, 0)
 	if len(msg.Header) > 0 {
 		for k, v := range msg.Header {
@@ -277,13 +277,14 @@ func (k *kBroker) Subscribe(topic string, handler broker.Handler, opts ...broker
 	if err != nil {
 		return nil, err
 	}
+	ctx := context.Background()
 	h := &consumerGroupHandler{
+		ctx:     ctx,
 		handler: handler,
 		subopts: opt,
 		kopts:   k.opts,
 		cg:      cg,
 	}
-	ctx := context.Background()
 	topics := []string{topic}
 	go func() {
 		for {

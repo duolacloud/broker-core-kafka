@@ -54,6 +54,7 @@ func SubscribeConfig(c *sarama.Config) broker.SubscribeOption {
 
 // consumerGroupHandler is the implementation of sarama.ConsumerGroupHandler
 type consumerGroupHandler struct {
+	ctx     context.Context
 	handler broker.Handler
 	subopts broker.SubscribeOptions
 	kopts   broker.Options
@@ -100,7 +101,7 @@ func (h *consumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, cl
 		}
 		m.Partition = msg.Partition
 
-		err := h.handler(p)
+		err := h.handler(h.ctx, p)
 		if err == nil && h.subopts.AutoAck {
 			sess.MarkMessage(msg, "")
 		} else if err != nil {
