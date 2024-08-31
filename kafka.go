@@ -234,8 +234,10 @@ func (k *kBroker) Publish(ctx context.Context, topic string, msg *broker.Message
 		body = msg.Body
 	}
 
+
 	var produceMsg = &sarama.ProducerMessage{
 		Topic:     topic,
+		Key:       opts.ShardingKey,
 		Value:     sarama.ByteEncoder(body),
 		Metadata:  msg,
 		Headers:   headers,

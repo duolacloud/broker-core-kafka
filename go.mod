@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/Shopify/sarama v1.37.2
-	github.com/duolacloud/broker-core v0.0.5-0.20240605111610-c8619ff3e84b 
+	github.com/duolacloud/broker-core v0.0.5
 	github.com/google/uuid v1.3.0
 )
 
