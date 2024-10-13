@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 	"github.com/duolacloud/broker-core"
 )
 
@@ -15,6 +15,11 @@ var (
 
 type brokerConfigKey struct{}
 type clusterConfigKey struct{}
+type groupNameConfigKey struct{}
+type skKey struct{}
+type akKey struct{}
+type regionKey struct{}
+type shardingKey struct{}
 
 func BrokerConfig(c *sarama.Config) broker.Option {
 	return setBrokerOption(brokerConfigKey{}, c)
@@ -22,6 +27,26 @@ func BrokerConfig(c *sarama.Config) broker.Option {
 
 func ClusterConfig(c *sarama.Config) broker.Option {
 	return setBrokerOption(clusterConfigKey{}, c)
+}
+
+func WithConsumerGroup(groupName string) broker.Option {
+	return setBrokerOption(groupNameConfigKey{}, groupName)
+}
+
+func WithSecretKey(secretKey string) broker.Option {
+	return setBrokerOption(skKey{}, secretKey)
+}
+
+func WithAccessKey(accessKey string) broker.Option {
+	return setBrokerOption(akKey{}, accessKey)
+}
+
+func WithRegionKey(region string) broker.Option {
+	return setBrokerOption(regionKey{}, region)
+}
+
+func WithShardingKey(key string) broker.Option {
+	return setBrokerOption(shardingKey{}, key)
 }
 
 type asyncProduceErrorKey struct{}
