@@ -1,25 +1,19 @@
+// Package kafka provides a kafka broker using sarama cluster
 package kafka
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/IBM/sarama"
-	"github.com/aws/aws-msk-iam-sasl-signer-go/signer"
-	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/duolacloud/broker-core"
+	"github.com/google/uuid"
 )
 
 type kBroker struct {
 	addrs []string
-
-	shardingKey string
-	secretKey   string
-	accessKey   string
-	region      string
 
 	c  sarama.Client
 	p  sarama.SyncProducer
@@ -118,21 +112,6 @@ func (k *kBroker) Connect() error {
 	pconfig.Producer.Return.Successes = true
 	pconfig.Producer.Return.Errors = true
 
-	pconfig.Net.SASL.Enable = true
-	pconfig.Net.SASL.Mechanism = sarama.SASLTypeOAuth
-	pconfig.Net.SASL.TokenProvider = &MSKAccessTokenProvider{
-		AccessKey: k.accessKey,
-		SecretKey: k.secretKey,
-		Region:    k.region,
-	}
-	pconfig.Metadata.AllowAutoTopicCreation = true
-
-	tlsConfig := tls.Config{}
-	pconfig.Net.TLS.Enable = true
-	pconfig.Net.TLS.Config = &tlsConfig
-
-	pconfig.Consumer.Offsets.Initial = sarama.OffsetOldest
-
 	c, err := sarama.NewClient(k.addrs, pconfig)
 	if err != nil {
 		return err
@@ -180,7 +159,6 @@ func (k *kBroker) Connect() error {
 	if p != nil {
 		k.p = p
 	}
-
 	if ap != nil {
 		k.ap = ap
 	}
@@ -204,7 +182,6 @@ func (k *kBroker) Disconnect() error {
 	if k.ap != nil {
 		k.ap.Close()
 	}
-
 	if err := k.c.Close(); err != nil {
 		return err
 	}
@@ -256,6 +233,7 @@ func (k *kBroker) Publish(ctx context.Context, topic string, msg *broker.Message
 	} else {
 		body = msg.Body
 	}
+
 	var sKey string
 	if v, ok := k.opts.Context.Value(shardingKey{}).(string); ok {
 		sKey = v
@@ -295,13 +273,11 @@ func (k *kBroker) getSaramaConsumerGroup(groupID string) (sarama.ConsumerGroup, 
 func (k *kBroker) Subscribe(topic string, handler broker.Handler, opts ...broker.SubscribeOption) (broker.Subscriber, error) {
 	opt := broker.SubscribeOptions{
 		AutoAck: true,
-		Queue:   k.opts.Context.Value(groupNameConfigKey{}).(string),
+		Queue:   uuid.New().String(),
 	}
-
 	for _, o := range opts {
 		o(&opt)
 	}
-
 	// we need to create a new client per consumer
 	cg, err := k.getSaramaConsumerGroup(opt.Queue)
 	if err != nil {
@@ -316,7 +292,6 @@ func (k *kBroker) Subscribe(topic string, handler broker.Handler, opts ...broker
 		cg:      cg,
 	}
 	topics := []string{topic}
-
 	go func() {
 		for {
 			select {
@@ -365,12 +340,7 @@ func NewBroker(opts ...broker.Option) broker.Broker {
 	if len(cAddrs) == 0 {
 		cAddrs = []string{"127.0.0.1:9092"}
 	}
-
 	return &kBroker{
-		secretKey: options.Context.Value(skKey{}).(string),
-		accessKey: options.Context.Value(akKey{}).(string),
-		region:    options.Context.Value(regionKey{}).(string),
-
 		addrs: cAddrs,
 		opts:  options,
 	}
@@ -409,23 +379,4 @@ func (k *kBroker) getClusterConfig() *sarama.Config {
 	clusterConfig.Consumer.Return.Errors = true
 	clusterConfig.Consumer.Offsets.Initial = sarama.OffsetNewest
 	return clusterConfig
-}
-
-type MSKAccessTokenProvider struct {
-	AccessKey string
-	SecretKey string
-	Region    string
-}
-
-func (m *MSKAccessTokenProvider) Token() (*sarama.AccessToken, error) {
-	// 读取AWS访问密钥和密钥ID的环境变量
-	accessKey := m.AccessKey
-	secretKey := m.SecretKey
-	region := m.Region
-	if accessKey == "" {
-		token, _, err := signer.GenerateAuthToken(context.TODO(), region)
-		return &sarama.AccessToken{Token: token}, err
-	}
-	token, _, err := signer.GenerateAuthTokenFromCredentialsProvider(context.TODO(), region, credentials.NewStaticCredentialsProvider(accessKey, secretKey, ""))
-	return &sarama.AccessToken{Token: token}, err
 }
