@@ -422,8 +422,10 @@ func (m *MSKAccessTokenProvider) Token() (*sarama.AccessToken, error) {
 	accessKey := m.AccessKey
 	secretKey := m.SecretKey
 	region := m.Region
-	// 创建一个新的CredentialsProvider
-	//creds := aws.NewCredentialsCache()
+	if accessKey == "" {
+		token, _, err := signer.GenerateAuthToken(context.TODO(), region)
+		return &sarama.AccessToken{Token: token}, err
+	}
 	token, _, err := signer.GenerateAuthTokenFromCredentialsProvider(context.TODO(), region, credentials.NewStaticCredentialsProvider(accessKey, secretKey, ""))
 	return &sarama.AccessToken{Token: token}, err
 }
