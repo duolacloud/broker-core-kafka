@@ -212,6 +212,13 @@ func (k *kBroker) Options() broker.Options {
 }
 
 func (k *kBroker) Publish(ctx context.Context, topic string, msg *broker.Message, opts ...broker.PublishOption) error {
+	pubopts := broker.PublishOptions{
+		Context: context.Background(),
+	}
+	for _, opt := range opts {
+		opt(&pubopts)
+	}
+
 	headers := make([]sarama.RecordHeader, 0)
 	if len(msg.Header) > 0 {
 		for k, v := range msg.Header {
@@ -234,14 +241,14 @@ func (k *kBroker) Publish(ctx context.Context, topic string, msg *broker.Message
 		body = msg.Body
 	}
 
-	var sKey string
-	if v, ok := k.opts.Context.Value(shardingKey{}).(string); ok {
-		sKey = v
+	var shardingKey string
+	if shardingKeyConfig := k.opts.Context.Value(shardingKeyConfigKey{}); shardingKeyConfig != nil {
+		shardingKey, _ = shardingKeyConfig.(string)
 	}
 
 	var produceMsg = &sarama.ProducerMessage{
 		Topic:     topic,
-		Key:       sarama.ByteEncoder(sKey),
+		Key:       sarama.ByteEncoder(shardingKey),
 		Value:     sarama.ByteEncoder(body),
 		Metadata:  msg,
 		Headers:   headers,

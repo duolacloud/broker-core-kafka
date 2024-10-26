@@ -25,8 +25,10 @@ func ClusterConfig(c *sarama.Config) broker.Option {
 	return setBrokerOption(clusterConfigKey{}, c)
 }
 
-func WithShardingKey(key string) broker.Option {
-	return setBrokerOption(shardingKey{}, key)
+type shardingKeyConfigKey struct{}
+
+func WithShardingKey(shardingKey string) broker.PublishOption {
+	return setPublishOption(shardingKeyConfigKey{}, shardingKey)
 }
 
 type asyncProduceErrorKey struct{}

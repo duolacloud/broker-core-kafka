@@ -24,13 +24,15 @@ func main() {
 		log.Fatal("broker connect failed", err)
 	}
 
+	bpopts := make([]broker.PublishOption, 0)
+	bpopts = append(bpopts, broker.WithShardingKey("key"))
 	err := b.Publish(context.Background(), "test_topic", &broker.Message{
 		Header: map[string]string{
 			"key": "value",
 		},
 		Body:      []byte("hello world"),
 		Partition: 0,
-	})
+	}, bpopts...)
 	if err == nil {
 		log.Printf("publish success\n")
 	} else {
@@ -38,7 +40,7 @@ func main() {
 	}
 
 	bsopts := make([]broker.SubscribeOption, 0)
-	bsopts = append(bsopts, broker.Queue("123"))
+	bsopts = append(bsopts, broker.Queue("test_group"))
 	b.Subscribe("test_topic", func(ctx context.Context, event broker.Event) error {
 		if err != nil {
 			log.Fatal("subscribe failed", err)
